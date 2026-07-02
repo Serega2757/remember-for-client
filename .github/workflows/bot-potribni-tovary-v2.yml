@@ -1,0 +1,33 @@
+name: Bot Potribni Tovary V2
+
+on:
+  schedule:
+    - cron: "30 7 * * *"   # 10:30 Kyiv summer time
+    - cron: "10 10 * * *"  # 13:10 Kyiv summer time
+    - cron: "45 14 * * *"  # 17:45 Kyiv summer time
+  workflow_dispatch:
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run bot
+        env:
+          ECHAT_API_URL: ${{ secrets.ECHAT_API_URL }}
+          ECHAT_API_KEY: ${{ secrets.ECHAT_API_KEY }}
+          ECHAT_CHANNEL_NUMBER: ${{ secrets.ECHAT_CHANNEL_NUMBER }}
+          GOOGLE_SPREADSHEET_ID: ${{ secrets.GOOGLE_SPREADSHEET_ID }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: python main.py
