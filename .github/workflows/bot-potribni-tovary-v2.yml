@@ -2,7 +2,6 @@ name: Bot Potribni Tovary V2
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
     - cron: "30 7 * * *"   # 10:30 Kyiv summer time
     - cron: "10 10 * * *"  # 13:10 Kyiv summer time
     - cron: "45 14 * * *"  # 17:45 Kyiv summer time
