@@ -5,6 +5,7 @@ import requests
 import gspread
 from datetime import datetime, date, timedelta
 from google.oauth2.service_account import Credentials
+from zoneinfo import ZoneInfo
 
 GID = 782899969
 
@@ -91,7 +92,53 @@ def build_message(name, product_name):
         f"{product_name}\n\n"
         "Можемо швидко оформити замовлення."
     )
+def should_run_now(spreadsheet):
+    kyiv_now = datetime.now(ZoneInfo("Europe/Kyiv"))
 
+    slots = [
+        ("10:30", 10, 30),
+        ("13:10", 13, 10),
+        ("17:45", 17, 45),
+    ]
+
+    matched_slot = None
+
+    for slot_name, hour, minute in slots:
+        target = kyiv_now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        diff_minutes = (kyiv_now - target).total_seconds() / 60
+
+        if 0 <= diff_minutes <= 90:
+            matched_slot = slot_name
+            break
+
+    if not matched_slot:
+        print(f"Зараз {kyiv_now.strftime('%H:%M')} Київ | Не час запуску")
+        return False
+
+    log_sheet_name = "BotRunLog"
+
+    try:
+        log_ws = spreadsheet.worksheet(log_sheet_name)
+    except gspread.WorksheetNotFound:
+        log_ws = spreadsheet.add_worksheet(title=log_sheet_name, rows=1000, cols=3)
+        log_ws.append_row(["date", "slot", "datetime"])
+
+    today_text = kyiv_now.strftime("%Y-%m-%d")
+    log_rows = log_ws.get_all_values()
+
+    for row in log_rows[1:]:
+        if len(row) >= 2 and row[0] == today_text and row[1] == matched_slot:
+            print(f"Слот {matched_slot} за {today_text} вже виконувався. Пропуск.")
+            return False
+
+    log_ws.append_row([
+        today_text,
+        matched_slot,
+        kyiv_now.strftime("%Y-%m-%d %H:%M:%S")
+    ])
+
+    print(f"Дозволено запуск | Слот {matched_slot} | Київ {kyiv_now.strftime('%H:%M')}")
+    return True
 
 def send_viber(phone, text, row_number):
     payload = {
@@ -159,7 +206,7 @@ def get_sheet():
 
     for ws in spreadsheet.worksheets():
         if ws.id == GID:
-            return ws
+            return spreadsheet, ws
 
     raise RuntimeError(f"Лист з gid={GID} не знайдено")
 
@@ -167,7 +214,10 @@ def get_sheet():
 def main():
     print("=== Старт БотПотрібніТовариV2 Python ===")
 
-    ws = get_sheet()
+    spreadsheet, ws = get_sheet()
+
+    if not should_run_now(spreadsheet):
+        return
     rows = ws.get_all_values()
 
     if len(rows) < 2:
